@@ -1,0 +1,67 @@
+******************************************************************************* Secret Santa Project ***************************************************************************
+
+Main Objective: 
+The Secret Santa application should allow a user to submit a list of names and email addresses, 
+then randomly send each participant the identity of the person they should give a gift to. 
+Exclusions can be set, for example, to prevent couples from giving each other a gift.
+
+Functional Requirements:
+-> The application manages one group at a time.
+-> Data can be imported manually by filling in a table or providing a CSV file.
+-> Implement error handling to ensure that each participant receives a name for gift-giving. 
+   Check that all emails are valid before the draw. Ensure that the people to be excluded are in the list (this can be done using table IDs).
+-> Participants will receive the name of their recipient via email. 
+   The organizer will receive a summary of all participants with the draw number to modify the draw if necessary.
+
+Technical Constraints:
+-> The application does not require authentication, making user management simpler.
+-> Emails will be sent using a service (to be determined), such as SendGrid, Mailjet, or Symfony’s integrated email service. Criteria: email quotas, cost, etc.
+-> Email sending tracking: Provide logs or notifications in case of email delivery failures (e.g., full inbox, invalid email).
+
+Security Constraints:
+-> Spam prevention: Protect against abuse by limiting sends per IP and implementing CAPTCHA to prevent misuse.
+-> Data protection: Ensure the security of email addresses. Consider temporarily encrypting email addresses stored in the database (if stored) and limit storage duration 
+   after the emails are sent. 
+   GDPR/Personal Data Protection compliance: Even if user data is not stored long-term, inform organizers and participants about data usage and its deletion after the draw.
+
+Application Evolution:
+-> The application will be scalable for a large number of participants (pagination method?).
+-> Possibly add authentication later to manage multiple groups per user.
+
+
+/*********************************************************Technical Considerations Before Development**********************************************************************/
+
+Application Modeling:
+-> No database for user management, but a temporary database is needed to store groups before sending emails.
+-> Create a simple model to represent a group of participants with their emails and recipients.
+-> Option: Create an algorithm to form a complete loop (A gives to B, B gives to C, C gives to D, D gives to E, and E gives to A). 
+   Standard draw vs. circular draw.
+
+Functional Domain:
+-> A form to submit the list of participants (name + email).
+-> Business logic to generate random pairs while respecting the rule of non-reciprocity (a participant should not give to themselves).
+-> Email service to send each participant their recipient.
+-> Routes: 4 URL routes will be created:
+    1) setupParticipants: Page for submitting the CSV form or filling in the name, email, and exclusion table. Button to proceed to step 2 (createMessage).
+    2) composeMessage: Page to prepare the email by entering the subject and body, giving instructions on rules, amount, location, date, etc. 
+    Button to proceed to step 3 (showDraw).
+    3) reviewDraw: Summary page showing the first two steps with a "read-only" table of names, emails, exclusions, and the email subject and body. 
+    The organizer can add their name so it appears in the email. General terms and conditions should be accepted here before sending emails. "Send emails" button.
+    4) summaryDraw: A brief summary page with participant names and the draw number, allowing the organizer to modify the draw later.
+
+Choose Technologies and Services:
+-> Symfony Framework: Already provides components for managing emails, form validation, etc.
+-> Email Sending Service: Use an external service like Mailjet, SendGrid, or another service supported by Symfony. 
+   Symfony has a Mailer component that simplifies this integration.
+-> Data Validation: Symfony has a Validator component to validate entered emails.
+
+Security and Data Management Plan:
+-> Abuse Protection: Limit the number of sends per user (based on IP, for example) and restrict the send frequency to prevent massive use in a short time.
+-> Email Protection: Ensure email addresses are not publicly exposed, and that sensitive data (even temporarily stored) is securely managed. 
+   Consider not storing email addresses at all, if unnecessary. For example, emails could be sent directly during the draw without storing them in the database. 
+   Alternatively, temporarily encrypt the emails stored in the database (using libraries like Sodium or OpenSSL).
+
+Testing and Deployment:
+-> Test email sends with test addresses and local environments.
+-> Consider deploying on a cloud service (like Heroku, DigitalOcean, or OVH) that securely manages email sending.
+-> Monitoring and Logs: Implement monitoring tools to track potential production bugs, especially email send failures or pairing generation errors.
