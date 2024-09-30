@@ -16,10 +16,12 @@ class Participant
     #[ORM\Column]
     private ?int $id = null;
 
+    #[Assert\NotBlank(message: "Le nom est obligatoire.")]
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $name = null;
 
-    #[Assert\Email(message: "L'adresse email '{{ value }}' n'est pas une adresse valide.")]
+    #[Assert\NotBlank(message: "L'email est obligatoire.")]
+    #[Assert\Email(message: "Veuillez entrer une adresse email valide.")]
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $email = null;
 
