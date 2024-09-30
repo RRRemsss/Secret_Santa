@@ -5,11 +5,9 @@ namespace App\Controller;
 use App\Entity\Group;
 use App\Form\GroupParticipantsType;
 use App\Form\GroupType;
-use App\Repository\GroupRepository;
 use App\Service\GroupManagerService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\File\Exception\FileException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -23,19 +21,32 @@ class GroupController extends AbstractController
          $participantForm = $this->createForm(GroupParticipantsType::class);
          $participantForm->handleRequest($request);
  
-         // Gestion de l'upload du fichier CSV
+         // Gestion de l'upload du fichier CSV/Excel
          if ($request->files->get('participantsCsv')) {
-             $file = $request->files->get('participantsCsv');
-             try {
-                 $participantsData = $groupManager->importFromCsv($file);
-                 // On crée un groupe avec les participants importés du CSV
-                 $group = $groupManager->createGroup($participantsData);
- 
-                 return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
-             } catch (FileException $e) {
-                 $this->addFlash('error', 'Error uploading CSV file.');
-             }
-         }
+            $file = $request->files->get('participantsCsv');
+            
+            try {
+                $extension = $file->getClientOriginalExtension();
+                if ($extension === 'csv') {
+                    // Si c'est un CSV, utilisez la méthode d'importation CSV
+                    $participantsData = $groupManager->importFromCsv($file);
+                } elseif (in_array($extension, ['xls', 'xlsx'])) {
+                    // Si c'est un fichier Excel, utilisez la méthode d'importation Excel
+                    $participantsData = $groupManager->importFromExcel($file);
+                } else {
+                    throw new \Exception('Format de fichier non supporté. Veuillez uploader un fichier CSV ou Excel.');
+                }
+        
+                if (empty($participantsData)) {
+                    $this->addFlash('error', 'Le fichier est vide ou mal formaté. Veuillez vérifier.');
+                } else {
+                    $group = $groupManager->createGroup($participantsData);
+                    return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
+                }
+            } catch (\Exception $e) {
+                $this->addFlash('error', 'Erreur lors de l\'importation du fichier : ' . $e->getMessage());
+            }
+        }
  
          // Si le formulaire est soumis et valide
          if ($participantForm->isSubmitted() && $participantForm->isValid()) {

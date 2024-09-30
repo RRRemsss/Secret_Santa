@@ -50,9 +50,9 @@
 
     <h2>Ou via un fichier CSV</h2>
     
-    <form method="post" enctype="multipart/form-data">
-        <input type="file" name="participantsCsv" accept=".csv">
-        <button type="submit" class="btn btn-secondary">Uploader CSV</button>
+    <form id="csvUploadForm" method="post" enctype="multipart/form-data">
+        <input type="file" id="participantsFile" name="participantsFile" accept=".csv, .xls, .xlsx">
+        <button type="button" id="uploadFileBtn" class="btn btn-secondary">Télécharger le fichier excel ou csv</button>
     </form>
 
     {% if app.flashes('error') %}
@@ -66,4 +66,5 @@
 {% block javascripts %}
     {{ parent() }}
     <script src="{{ asset('assets/js/extendArray.js') }}"></script>
+    <script src="{{ asset('assets/js/uploadFile.js') }}"></script>
 {% endblock %}
