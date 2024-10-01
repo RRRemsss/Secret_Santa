@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Group;
 use App\Entity\Participant;
+use App\Repository\ParticipantRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
@@ -11,33 +12,50 @@ use Symfony\Component\HttpFoundation\File\Exception\FileException;
 class GroupManagerService
 {
     private $entityManager;
+    private $participantRepository;
 
     // On injecte l'EntityManager pour la gestion des entités dans la base de données
-    public function __construct(EntityManagerInterface $entityManager)
+    public function __construct(EntityManagerInterface $entityManager, ParticipantRepository $participantRepository)
     {
         $this->entityManager = $entityManager;
+        $this ->participantRepository = $participantRepository;
     }
 
     // Méthode pour créer un groupe à partir d'un tableau de participants
-    public function createGroup(array $participantsData): Group
+    public function createGroup(array $participantsData)
     {
-        // Crée une nouvelle entité Group
         $group = new Group();
 
-        // Pour chaque participant, on crée une entité Participant
         foreach ($participantsData as $data) {
             $participant = new Participant();
             $participant->setName($data['name']);
             $participant->setEmail($data['email']);
-            $participant->setGroup($group);  // Liaison avec le groupe
-            $group->addParticipant($participant);  // Ajout du participant au groupe
+            
+            // Associer les exclusions au participant
+            if (!empty($data['exclusion'])) {
+                foreach ($data['exclusion'] as $excludedId) {
+                    // Tu pourrais avoir besoin d'une méthode pour associer l'exclusion par ID
+                    $excludedParticipant = $this->findParticipantById($excludedId);
+                    if ($excludedParticipant) {
+                        $participant->addExclusion($excludedParticipant);
+                    }
+                }
+            }
+
+            $group->addParticipant($participant);
         }
 
-        // On persiste le groupe et les participants dans la base de données
+        // Persister et enregistrer le groupe
         $this->entityManager->persist($group);
         $this->entityManager->flush();
 
         return $group;
+    }
+
+    private function findParticipantById($id)
+    {
+        // Implémente la logique pour retrouver un participant par ID (par exemple, via une base de données ou les données importées)
+        return $this->participantRepository->find($id);
     }
 
     public function importFromCsv($file): array
@@ -60,10 +78,15 @@ class GroupManagerService
                         throw new FileException("Ligne $rowNumber: L'adresse email '{$data[1]}' est invalide.");
                     }
 
+                    // Gestion des exclusions
+                    $exclusionString = $data[2] ?? '';  // Récupère la colonne "exclusion" ou une chaîne vide si elle n'existe pas
+                    $exclusionArray = array_filter(array_map('trim', explode(',', $exclusionString))); // Transforme la chaîne en tableau, enlève les espaces
+
+                    // Ajouter le participant avec les exclusions
                     $participants[] = [
                         'name' => $name,
                         'email' => $email,
-                        'exclusion' => $data[2] ?? null  // Ajout de la colonne "exclusion" si elle existe
+                        'exclusion' => $exclusionArray // Ajoute les exclusions comme un tableau d'IDs
                     ];
                 } else {
                     // Si la ligne est incorrecte, on peut lancer une exception
@@ -78,27 +101,44 @@ class GroupManagerService
         return $participants;
     }
 
+
    // Méthode pour importer les participants à partir d'un fichier Excel
    public function importFromExcel($file): array
    {
-       $participants = [];
+    $participants = [];
 
-       // Lecture du fichier Excel
-       $spreadsheet = IOFactory::load($file->getRealPath());
-       $sheet = $spreadsheet->getActiveSheet();
-       $rows = $sheet->toArray();
+    try {
+        // Chargement du fichier Excel
+        $spreadsheet = IOFactory::load($file->getRealPath());
+        $worksheet = $spreadsheet->getActiveSheet();
 
-       foreach ($rows as $row) {
-           // Vérifier que la ligne contient au moins 2 colonnes (nom et email)
-           if (count($row) >= 2) {
-               $participants[] = ['name' => $row[0], 'email' => $row[1]];
-           } else {
-               // Optionnel : Vous pouvez ajouter une gestion des erreurs ici, par exemple en lançant une exception ou en ajoutant un message d'erreur
-               throw new FileException('Invalid Excel format. Each line must contain at least 2 columns (name and email).');
-           }
-       }
+        // Itérer sur les lignes du tableau
+        foreach ($worksheet->getRowIterator() as $row) {
+            // Créer un itérateur pour les cellules
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(false); // Obtenir toutes les cellules, même vides
 
-       return $participants;
+            $data = [];
+            foreach ($cellIterator as $cell) {
+                $data[] = $cell->getValue();
+            }
+
+            // Sauter la première ligne (en-tête) et vérifier le format
+            if ($row->getRowIndex() > 1 && count($data) >= 2) { // On commence à 2 pour ignorer l'en-tête
+                $exclusions = isset($data[2]) ? explode(',', $data[2]) : [];
+
+                $participants[] = [
+                    'name' => $data[0],
+                    'email' => $data[1],
+                    'exclusion' => array_map('trim', $exclusions), // Nettoyer et stocker les exclusions comme un tableau
+                ];
+            }
+        }
+    } catch (\Exception $e) {
+        throw new \Exception('Erreur lors de la lecture du fichier Excel : ' . $e->getMessage());
+    }
+
+    return $participants;
    }
 }
 

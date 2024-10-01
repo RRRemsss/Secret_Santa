@@ -48,21 +48,33 @@ class GroupController extends AbstractController
             }
         }
  
-         // Si le formulaire est soumis et valide
-         if ($participantForm->isSubmitted() && $participantForm->isValid()) {
-             // Récupérer les données du formulaire
-             $participantsData = $participantForm->getData()['participants'];
- 
-             // Crée un nouveau groupe avec les participants saisis
-             $group = $groupManager->createGroup($participantsData);
- 
-             return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
-         }
- 
-         return $this->render('group/setup_participants.html.twig', [
-             'participantForm' => $participantForm->createView(),
-         ]);
-     }
+        // Si le formulaire est soumis et valide
+        if ($participantForm->isSubmitted() && $participantForm->isValid()) {
+            // Récupérer les données du formulaire
+            $participantsData = $participantForm->getData()['participants'];
+
+            // Traiter les exclusions au format CSV (ou formulaire manuel)
+            foreach ($participantsData as &$participant) {
+                // Vérifier si des exclusions sont présentes
+                if (!empty($participant['exclusion'])) {
+                    // Transformer la chaîne des exclusions en tableau d'IDs
+                    $participant['exclusion'] = array_filter(array_map('trim', explode(';', $participant['exclusion'])));
+                } else {
+                    // Si aucune exclusion, définir une exclusion vide
+                    $participant['exclusion'] = [];
+                }
+            }
+
+            // Crée un nouveau groupe avec les participants et leurs exclusions
+            $group = $groupManager->createGroup($participantsData);
+
+            return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
+        }
+
+        return $this->render('group/setup_participants.html.twig', [
+            'participantForm' => $participantForm->createView(),
+        ]);
+    }
 
 
     #[Route('/composeMessage/{groupId}', name: 'group_compose_message', methods: ['GET', 'POST'])]
