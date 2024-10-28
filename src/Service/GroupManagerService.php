@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Group;
 use App\Entity\Participant;
+use App\Repository\GroupRepository;
 use App\Repository\ParticipantRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -13,28 +14,46 @@ class GroupManagerService
 {
     private $entityManager;
     private $participantRepository;
+    private $groupRepository;
+    
 
     // On injecte l'EntityManager pour la gestion des entités dans la base de données
-    public function __construct(EntityManagerInterface $entityManager, ParticipantRepository $participantRepository)
+    public function __construct(EntityManagerInterface $entityManager, ParticipantRepository $participantRepository, GroupRepository $groupRepository)
     {
         $this->entityManager = $entityManager;
         $this ->participantRepository = $participantRepository;
+        $this->groupRepository = $groupRepository;
     }
+
+    // Méthode pour générer un numéro de tirage
+    private function generateDrawNumber(): string
+    {
+        // Format de la date : année (2 chiffres), mois (2 chiffres), jour (2 chiffres)
+        $datePart = date('ymd');
+        // Générer un nombre aléatoire de 4 chiffres
+        $randomPart = mt_rand(1000, 9999);
+        // Combiner la date et le nombre aléatoire
+        return $datePart . $randomPart;
+    }
+   
 
     // Méthode pour créer un groupe à partir d'un tableau de participants
     public function createGroup(array $participantsData)
     {
         $group = new Group();
 
+        // Générer et assigner le numéro de tirage
+        $group->setDrawNumber($this->generateDrawNumber());
+
         foreach ($participantsData as $data) {
             $participant = new Participant();
             $participant->setName($data['name']);
             $participant->setEmail($data['email']);
-            
+            $group->addParticipant($participant);
+           
             // Associer les exclusions au participant
             if (!empty($data['exclusion'])) {
                 foreach ($data['exclusion'] as $excludedId) {
-                    // Tu pourrais avoir besoin d'une méthode pour associer l'exclusion par ID
                     $excludedParticipant = $this->findParticipantById($excludedId);
                     if ($excludedParticipant) {
                         $participant->addExclusion($excludedParticipant);
@@ -42,8 +61,10 @@ class GroupManagerService
                 }
             }
 
-            $group->addParticipant($participant);
+            $this->entityManager->persist($participant);  
         }
+
+        $group->setCreatedAt(new \DateTime());
 
         // Persister et enregistrer le groupe
         $this->entityManager->persist($group);
@@ -52,12 +73,20 @@ class GroupManagerService
         return $group;
     }
 
+    // Méthode permettant de retrouver un groupe par ID (par exemple, via une base de données ou les données importées)
+    public function findGroupById($id): ?Group
+    {
+        return $this->groupRepository->find($id);
+    }
+
+    //  Méthode permettant de retrouver un participant par ID (par exemple, via une base de données ou les données importées)
     private function findParticipantById($id)
     {
-        // Implémente la logique pour retrouver un participant par ID (par exemple, via une base de données ou les données importées)
         return $this->participantRepository->find($id);
     }
 
+
+    // Méthode pour importer les participants à partir d'un fichier CSV
     public function importFromCsv($file): array
     {
         $participants = [];
@@ -140,6 +169,7 @@ class GroupManagerService
 
     return $participants;
    }
+
 }
 
 

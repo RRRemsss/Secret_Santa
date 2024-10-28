@@ -17,17 +17,14 @@ class Group
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column]
-    private ?int $drawNumber = null;
+    #[ORM\Column (length:10)]
+    private ?string $drawNumber = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $updatedAt = null;
-
-    #[ORM\Column]
-    private ?bool $isCompleted = null;
 
     /**
      * @var Collection<int, Draw>
@@ -59,12 +56,12 @@ class Group
         return $this->id;
     }
 
-    public function getDrawNumber(): ?int
+    public function getDrawNumber(): ?string
     {
         return $this->drawNumber;
     }
 
-    public function setDrawNumber(int $drawNumber): self
+    public function setDrawNumber(string $drawNumber): self
     {
         $this->drawNumber = $drawNumber;
 
@@ -95,17 +92,6 @@ class Group
         return $this;
     }
 
-    public function isCompleted(): ?bool
-    {
-        return $this->isCompleted;
-    }
-
-    public function setCompleted(bool $isCompleted): self
-    {
-        $this->isCompleted = $isCompleted;
-
-        return $this;
-    }
 
     /**
      * @return Collection<int, Draw>

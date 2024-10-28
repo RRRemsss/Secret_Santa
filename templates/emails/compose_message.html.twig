@@ -1,0 +1,34 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Compose ton message pour le Secret Santa{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1>Tirage au sort du Secret Santa</h1>
+
+    <p>En 3 étapes, tu vas introduire toutes les informations nécessaires pour réaliser le tirage au sort par e-mail :</p>
+    <ol>
+        <li>Remplis les noms et e-mails de tes amis. Ajoute des exclusions entre eux !</li>
+        <li>Écris le message que vous recevrez. Maintenant, tu peux utiliser des emojis ! 💖😻🙌</li>
+        <li>Vérifie tout et envoie les e-mails.</li>
+    </ol>
+
+    <h2>Compose ton message</h2>
+
+    {{ form_start(messageForm) }}
+    <div class="form-group">
+        <label for="subject">Objet:</label>
+        {{ form_widget(messageForm.subject, {'attr': {'class': 'form-control', 'id': 'subject'}}) }}
+    </div>
+
+    <div class="form-group">
+        <label for="body">Message:</label>
+        <small>Explique les conditions de ton tirage, le prix maximum du cadeau, la date limite, ajoute des emojis 🚀😊💖👏...</small>
+        {{ form_widget(messageForm.body, {'attr': {'class': 'form-control', 'id': 'body'}}) }}
+    </div>
+
+    <button type="submit" class="btn btn-primary">Passer à l'étape 3</button>
+    {{ form_end(messageForm) }}
+
+</div>
+{% endblock %}
