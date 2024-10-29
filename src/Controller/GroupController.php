@@ -2,13 +2,11 @@
 
 namespace App\Controller;
 
-use App\Entity\Group;
 use App\Form\ComposeMessageType;
 use App\Form\GroupParticipantsType;
 use App\Form\GroupType;
 use App\Service\EmailService;
 use App\Service\GroupManagerService;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,14 +17,14 @@ class GroupController extends AbstractController
 {
     #[Route('/setup/participant', name: 'setup_participants', methods: ['GET', 'POST'])]
     public function setupParticipants(Request $request, GroupManagerService $groupManager) {
-         // Create a form to manually add participants
-         $participantForm = $this->createForm(GroupParticipantsType::class);
-         $participantForm->handleRequest($request);
- 
-         // Handling the CSV/Excel file upload
-         if ($request->files->get('participantsCsv')) {
+        // Create a form to manually add participants
+        $participantForm = $this->createForm(GroupParticipantsType::class);
+        $participantForm->handleRequest($request);
+
+        // Handling the CSV/Excel file upload
+        if ($request->files->get('participantsCsv')) {
             $file = $request->files->get('participantsCsv');
-            
+
             try {
                 $extension = $file->getClientOriginalExtension();
                 if ($extension === 'csv') {
@@ -38,44 +36,37 @@ class GroupController extends AbstractController
                 } else {
                     throw new \Exception('Format de fichier non supporté. Veuillez uploader un fichier CSV ou Excel.');
                 }
-        
+
                 if (empty($participantsData)) {
                     $this->addFlash('error', 'Le fichier est vide ou mal formaté. Veuillez vérifier.');
                 } else {
                     $group = $groupManager->createGroup($participantsData);
+                    $request->getSession()->set('participantsData', $participantsData);
                     return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
                 }
             } catch (\Exception $e) {
                 $this->addFlash('error', 'Erreur lors de l\'importation du fichier : ' . $e->getMessage());
             }
         }
- 
-        if ($participantForm->isSubmitted() && $participantForm->isValid()) {
-            // Retrieve data from the form
-            $group = $participantForm->getData();
-            $participantsData = $group->getParticipants();
 
-            // Convert ArrayCollection to an array
+        if ($participantForm->isSubmitted() && $participantForm->isValid()) {
+            // Process the submitted form data
+            $formData = $request->request->all('participant'); // Retrieve "participant" data as an associative array
+            // Prepare data for session storage
             $participantsArray = [];
-            foreach ($participantsData as $participant) {
-                $exclusions = $participant->getExclusions();
-                $exclusionIds = [];
-                foreach ($exclusions as $exclusion) {
-                    $exclusionIds[] = $exclusion->getId();
-                }
+            foreach ($formData as $index => $participant) {
                 $participantsArray[] = [
-                    'name' => $participant->getName(),
-                    'email' => $participant->getEmail(),
-                    'exclusion' => $exclusionIds,
+                    'id' => $index + 1,
+                    'name' => $participant['name'] ?? null,
+                    'email' => $participant['email'] ?? null,
+                    'exclusion' => isset($participant['exclusion']) ? explode(',', $participant['exclusion']) : [],
                 ];
             }
-
-            // Assuming $participantsData is an ArrayCollection
-            $participantsData = $group->getParticipants(); 
-            $participantsDataArray = $participantsData->toArray();
-            // Create a new group with participants and their exclusions
-            $group = $groupManager->createGroup($participantsDataArray);
-
+        
+            // Create the group and store participants in session
+            $group = $groupManager->createGroup($participantsArray);
+            $request->getSession()->set('participantsData', $participantsArray);
+        
             return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
         }
 
@@ -111,7 +102,7 @@ class GroupController extends AbstractController
             $request->getSession()->set('email_body', $body);
 
             // Redirect to the next step (reviewDraw)
-            return $this->redirectToRoute('review_draw', ['groupId' => $group->getId()]);
+            return $this->redirectToRoute('group_review_draw', ['groupId' => $group->getId()]);
         }
 
         return $this->render('emails/compose_message.html.twig', [
@@ -120,8 +111,8 @@ class GroupController extends AbstractController
         ]);
     }
 
-    #[Route('/reviewDraw/{groupId}', name: 'review_draw', methods: ['GET'])]
-    public function reviewDraw (Request $request, int $groupId, GroupManagerService $groupManager, EmailService $emailService): Response
+    #[Route('/reviewDraw/{groupId}', name: 'review_draw', methods: ['GET', 'POST'])]
+    public function reviewDraw(Request $request, int $groupId, GroupManagerService $groupManager, EmailService $emailService): Response
     {
         $group = $groupManager->findGroupById($groupId);
 
@@ -132,6 +123,30 @@ class GroupController extends AbstractController
         // Retrieve the subject and body from the session
         $subject = $request->getSession()->get('email_subject');
         $body = $request->getSession()->get('email_body');
+
+        // Retrieve the participants and their exclusions from the session
+        $participantsData = $request->getSession()->get('participantsData', []);
+
+        // Mapping IDs to name of the participants
+        $nameById = [];
+        foreach ($participantsData as $participant) {
+            // Ensure that the 'id' key exists
+            if (isset($participant['id'])) {
+                $nameById[$participant['id']] = $participant['name'];  // Associate each ID to their participant's name
+            }
+        }
+
+        // Transform exclusions to use the names instead of the IDs.
+        foreach ($participantsData as &$participant) {
+            $exclusionNames = [];
+            foreach ($participant['exclusion'] as $excludedId) {
+                // Varifyong if the name asscicated to the ID exist
+                if (isset($nameById[$excludedId])) {
+                    $exclusionNames[] = $nameById[$excludedId]; // Get name
+                }
+            }
+            $participant['exclusion_names'] = $exclusionNames; // Add name to th exclusions
+        }
 
         // Create a form for reviewing the draw
         $reviewDrawForm = $this->createForm(GroupType::class, $group);
@@ -150,6 +165,12 @@ class GroupController extends AbstractController
             'reviewDrawForm' => $reviewDrawForm->createView(),
             'subject' => $subject,
             'body' => $body,
+            'participants' => $participantsData,
         ]);
     }
+    // #[Route('/summaryDraw/{groupId}', name: 'summary_draw', methods: ['GET', 'POST'])]
+    // public function summaryDraw(Request $request, int $groupId, GroupManagerService $groupManager, EmailService $emailService): Response
+    // {
+       
+    // }
 }

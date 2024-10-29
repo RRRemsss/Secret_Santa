@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Résumé du tirage {% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1>Tirage au sort du Secret Santa</h1>
+
+    <p>En 3 étapes, tu vas introduire toutes les informations nécessaires pour réaliser le tirage au sort par e-mail :</p>
+    <ol>
+        <li>Remplis les noms et e-mails de tes amis. Ajoute des exclusions entre eux !</li>
+        <li>Écris le message que vous recevrez. Maintenant, tu peux utiliser des emojis ! 💖😻🙌</li>
+        <li>Vérifie tout et envoie les e-mails.</li>
+    </ol>
+
+    <h2>Consultez votre liste d'amis...</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Exclusions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for participant in participants %}
+                <tr>
+                    <td>{{ participant.name }}</td>
+                    <td>{{ participant.email }}</td>
+                    <td>
+                        {% if participant.exclusion_names is not empty %}
+                            {{ participant.exclusion_names|join(', ') }}
+                        {% else %}
+                            <!-- Empty field -->
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="3">No participants found.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+    <h2>... Et aussi l'email qu'ils recevront...</h2>
+
+    <p><strong>Sujet:</strong> {{ subject }}</p>
+    <p><strong>Message:</strong></p>
+    <pre>{{ body }}</pre>
+
+    {{ form_start(reviewDrawForm) }}
+    {{ form_widget(reviewDrawForm) }}
+    <button type="submit" class="btn btn-primary">Submit</button>
+    {{ form_end(reviewDrawForm) }}
+
+</div>
+{% endblock %}

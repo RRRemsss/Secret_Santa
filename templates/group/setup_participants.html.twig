@@ -5,14 +5,16 @@
 {% block body %}
     <h1>Liste des participants</h1>
 
+    <!-- Formulaire englobant pour soumettre les participants -->
+    {{ form_start(participantForm) }}
+    
     <h2>Nombre de participants</h2>
     <input type="number" id="numberOfParticipants" value="10" min="1" class="form-control" style="width: 100px; display: inline-block;">
     <button type="button" id="updateTable" class="btn btn-primary">Mettre à jour le tableau</button>
 
     <h2>Ajoutez les participants manuellement</h2>
 
-    {{ form_start(participantForm) }}
-
+    <!-- Tableau des participants -->
     <table class="table" id="participantsTable">
         <thead>
             <tr>
@@ -20,36 +22,38 @@
                 <th>Prénom</th>
                 <th>Email</th>
                 <th>Exclusion</th>
+                <th>Actions</th>
             </tr>
         </thead>
-         <tbody>
-                {% for i in 0..2 %}
-                    <tr>
-                        <td>{{ i + 1 }}</td>
-                        <td>
-                            <input type="text" name="participant[{{ i }}][nom]" class="form-control" placeholder="Nom du joueur">
-                        </td>
-                        <td>
-                            <input type="email" name="participant[{{ i }}][email]" class="form-control" placeholder="Email du joueur">
-                        </td>
-                        <td>
-                            <input type="text" name="participant[{{ i }}][exclusion]" class="form-control" placeholder="Exclusion">
-                        </td>
-                        <td>
-                            <button type="button" class="btn btn-danger btn-remove-row">Supprimer</button>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
+        <tbody>
+            {% for i in 0..2 %}
+                <tr>
+                    <td>{{ i + 1 }}</td>
+                    <td>
+                        <input type="text" name="participant[{{ i }}][name]" class="form-control" placeholder="Nom du joueur">
+                    </td>
+                    <td>
+                        <input type="email" name="participant[{{ i }}][email]" class="form-control" placeholder="Email du joueur">
+                    </td>
+                    <td>
+                        <input type="text" name="participant[{{ i }}][exclusion]" class="form-control" placeholder="Exclusion">
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-remove-row">Supprimer</button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
     </table>
-    
+
+    <!-- Boutons pour ajouter des lignes et soumettre le formulaire -->
     <button type="button" id="addRow" class="btn btn-primary">Ajouter un participant</button>
     <button type="submit" class="btn btn-success">Étape 2: Composer le message</button>
 
     {{ form_end(participantForm) }}
 
+    <!-- Formulaire de téléchargement séparé pour le fichier CSV -->
     <h2>Ou via un fichier CSV</h2>
-    
     <form id="csvUploadForm" method="post" enctype="multipart/form-data">
         <input type="file" id="participantsFile" name="participantsFile" accept=".csv, .xls, .xlsx">
         <button type="button" id="uploadFileBtn" class="btn btn-secondary">Télécharger le fichier excel ou csv</button>
@@ -60,7 +64,6 @@
             {{ app.flashes('error')|first }}
         </div>
     {% endif %}
-
 {% endblock %}
 
 {% block javascripts %}

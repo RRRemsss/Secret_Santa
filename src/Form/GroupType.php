@@ -19,7 +19,6 @@ class GroupType extends AbstractType
             ->add('updatedAt', null, [
                 'widget' => 'single_text',
             ])
-            ->add('isCompleted')
         ;
     }
 
