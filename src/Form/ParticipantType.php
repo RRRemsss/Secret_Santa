@@ -17,22 +17,23 @@ class ParticipantType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'label' => false,
+                'required' => true,
                 'attr' => ['placeholder' => 'Prénom du participant', 
                             'class' => 'form-control'],
             ])
             ->add('email', EmailType::class, [
                 'label' => false,
+                'required' => true,
                 'attr' => ['placeholder' => 'Email du participant', 
                             'class' => 'form-control'],
             ])
-            ->add('exclusions', EntityType::class, [
-                'class' => Participant::class,
-                'choice_label' => 'name',
-                'multiple' => true,       // Permettre plusieurs exclusions
-                'expanded' => true,       // Afficher sous forme de cases à cocher pour meilleure UX
+            ->add('exclusions', TextType::class, [
                 'required' => false,      // Les exclusions ne sont pas obligatoires
-                'attr' => ['class' => 'form-control'],
-                'by_reference' => false,  // Gère correctement les relations many-to-many
+                'attr' => [
+                    'placeholder' => 'Exclure les participants avec leurs indices séparés par une virgule', 
+                    'class' => 'form-control'
+                ],
+                
             ])
         ;
     }

@@ -17,12 +17,12 @@ class Participant
     private ?int $id = null;
 
     #[Assert\NotBlank(message: "Le nom est obligatoire.")]
-    #[ORM\Column(length: 100, nullable: true)]
+    #[ORM\Column(length: 100)]
     private ?string $name = null;
 
     #[Assert\NotBlank(message: "L'email est obligatoire.")]
     #[Assert\Email(message: "Veuillez entrer une adresse email valide.")]
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(length: 255)]
     private ?string $email = null;
 
     #[ORM\ManyToMany(targetEntity: Participant::class, inversedBy: 'excludedBy')]

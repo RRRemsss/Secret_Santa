@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\Draw;
 use App\Entity\Group;
 use App\Entity\Participant;
 use App\Repository\GroupRepository;
@@ -31,7 +32,7 @@ class GroupManagerService
         // Format de la date : année (2 chiffres), mois (2 chiffres), jour (2 chiffres)
         $datePart = date('ymd');
         // Générer un nombre aléatoire de 4 chiffres
-        $randomPart = mt_rand(1000, 9999);
+        $randomPart = mt_rand(0000, 9999);
         // Combiner la date et le nombre aléatoire
         return $datePart . $randomPart;
     }
@@ -169,6 +170,99 @@ class GroupManagerService
 
     return $participants;
    }
+
+   public function assignReceiversToGivers(Group $group): void
+   {
+    $participants = $group->getParticipants()->toArray();
+    $maxAttempts = 100; // Limite des tentatives
+    $attempt = 0;
+
+    while ($attempt < $maxAttempts) {
+        $assignments = [];
+        $availableReceivers = $participants;
+
+        try {
+            foreach ($participants as $giver) {
+                // Récupérer les exclusions du donneur
+                $exclusions = $giver->getExclusions()->map(fn($exclusion) => $exclusion->getId())->toArray();
+                $exclusions[] = $giver->getId(); // Ajouter le donneur lui-même
+
+                // Filtrer les receveurs possibles
+                $possibleReceivers = array_filter($availableReceivers, function ($receiver) use ($exclusions) {
+                    return !in_array($receiver->getId(), $exclusions, true);
+                });
+
+                // Si aucun receveur possible, rejeter cette tentative
+                if (empty($possibleReceivers)) {
+                    throw new \Exception('Impossible de compléter l\'assignation.');
+                }
+
+                // Choisir un receveur au hasard parmi les candidats
+                $receiver = $possibleReceivers[array_rand($possibleReceivers)];
+                $assignments[$giver->getId()] = $receiver;
+
+                // Retirer le receveur choisi des disponibles
+                $availableReceivers = array_filter($availableReceivers, fn($r) => $r !== $receiver);
+            }
+
+            // Si toutes les assignations sont valides, créer les relations
+            foreach ($assignments as $giverId => $receiver) {
+                $giver = $this->entityManager->getRepository(Participant::class)->find($giverId);
+
+                $draw = new Draw();
+                $draw->setGiver($giver);
+                $draw->setReceiver($receiver);
+                $draw->setGroup($group);
+                $this->entityManager->persist($draw);
+            }
+
+            $this->entityManager->flush();
+            return; // Tirage réussi
+        } catch (\Exception $e) {
+                // Réessayer en cas d'échec
+                $attempt++;
+            }
+        }
+
+    throw new \Exception('Échec de l\'assignation après plusieurs tentatives.');
+    }
+
+
+    public function drawParticipants(array $participants): array
+    {
+        $results = []; // Résultat des tirages sous forme de paires [donneur => receveur]
+        $availableReceivers = array_keys($participants); // Liste des indices disponibles pour le tirage
+
+        foreach ($participants as $giverIndex => $giver) {
+            // Récupérer les exclusions du donneur
+            $exclusions = isset($giver['exclusion']) && is_array($giver['exclusion'])
+                ? array_map('intval', $giver['exclusion'])
+                : [];
+
+            // Ajouter le donneur lui-même dans ses exclusions
+            $exclusions[] = $giverIndex + 1;
+
+            // Filtrer les receveurs possibles
+            $possibleReceivers = array_filter($availableReceivers, function ($receiverIndex) use ($exclusions) {
+                return !in_array($receiverIndex + 1, $exclusions, true); // Comparer à la base 1
+            });
+
+            // Si aucun receveur possible, le tirage est impossible
+            if (empty($possibleReceivers)) {
+                throw new \Exception("Impossible de compléter le tirage. Vérifiez les exclusions.");
+            }
+
+            // Choisir un receveur parmi les possibilités
+            $receiverIndex = $possibleReceivers[array_rand($possibleReceivers)];
+            $results[$giver['name']] = $participants[$receiverIndex]['name'];
+
+            // Retirer le receveur choisi de la liste des receveurs disponibles
+            unset($availableReceivers[array_search($receiverIndex, $availableReceivers)]);
+        }
+
+        return $results;
+    }
+
 
 }
 

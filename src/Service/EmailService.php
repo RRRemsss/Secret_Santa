@@ -3,7 +3,7 @@
 namespace App\Service;
 
 use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Twig\Environment; // Pour le templating avec Twig
 use App\Entity\Group;
 
@@ -46,19 +46,20 @@ class EmailService
     public function sendGroupEmail(Group $group, string $subject, string $body): void
     {
         foreach ($group->getParticipants() as $participant) {
-            $email = (new Email())
-            ->from('hello@example.com')
-            ->to('you@example.com')
-            //->cc('cc@example.com')
-            //->bcc('bcc@example.com')
-            //->replyTo('fabien@example.com')
-            //->priority(Email::PRIORITY_HIGH)
-            ->subject('Time for Symfony Mailer!')
-            ->text('Sending emails is fun again!')
-            ->html('<p>See Twig integration for better HTML integration!</p>');
+            $email = (new TemplatedEmail())
+            ->from('no-reply@demomailtrap.com')  
+            ->to($participant->getEmail())
+            ->subject($subject) 
+            ->htmlTemplate('emails/group_email.html.twig') // Template HTML pour l'email
+            ->context([
+                'participant' => $participant, // Passer des données au template
+                'body' => $body,
+                'subject' => $subject,
+            ]);
 
-            // Envoi de l'email
-            $this->mailer->send($email);
-        }
+        // Envoi de l'email
+        $this->mailer->send($email);
+    
+    }
     }
 }

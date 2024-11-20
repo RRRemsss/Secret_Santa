@@ -20,6 +20,7 @@ class GroupParticipantsType extends AbstractType
             'allow_add' => true,  // Autorise l'ajout dynamique de participants
             'allow_delete' => true,  // Autorise la suppression dynamique
             'prototype' => true,  // Génère un prototype pour ajouter via JavaScript
+            'prototype_name' => '__name__',  // Placeholde pour les noms dynamiques
             'by_reference' => false,  // Important pour ManyToMany ou OneToMany relations
         ]);
     }

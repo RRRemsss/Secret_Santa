@@ -2,130 +2,103 @@
 
 namespace App\Tests\Controller;
 
-use App\Entity\Group;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\EntityRepository;
-use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
-final class GroupControllerTest extends WebTestCase
+class GroupControllerTest extends WebTestCase
 {
-    private KernelBrowser $client;
-    private EntityManagerInterface $manager;
-    private EntityRepository $repository;
-    private string $path = '/group/';
+    // public function testSetupParticipantsWithValidCsvUpload()
+    // {
+    //     // Créez un client de test Symfony
+    //     $client = static::createClient();
 
-    protected function setUp(): void
+    //     // Préparez le fichier CSV de test
+    //     $file = new UploadedFile(
+    //         __DIR__.'/Fixtures/valid_participants.csv', // Le chemin vers le fichier CSV
+    //         'valid_participants.csv', // Le nom du fichier
+    //         'text/csv', // Le type MIME du fichier
+    //         null, // La taille du fichier (optionnel)
+    //         true // Est-ce un fichier valide ?
+    //     );
+
+    //     // Soumettre le formulaire avec le fichier CSV
+    //     $crawler = $client->request('GET', '/group/setup/participant');
+    //     $form = $crawler->selectButton('Télécharger le fichier excel ou csv')->form();
+    //     $form['participantsCsv'] = $file;
+
+    //     // Envoyer le formulaire
+    //     $client->submit($form);
+
+    //     // Vérifier si la redirection vers une autre page se produit
+    //     $this->assertResponseRedirects('/group/compose_message');
+    // }
+
+    public function testSetupParticipantsWithValidFormSubmission()
     {
-        $this->client = static::createClient();
-        $this->manager = static::getContainer()->get('doctrine')->getManager();
-        $this->repository = $this->manager->getRepository(Group::class);
+        $client = static::createClient();
+        
+        // Simuler un formulaire de participants
+        $crawler = $client->request('GET', '/group/setup/participant');
 
-        foreach ($this->repository->findAll() as $object) {
-            $this->manager->remove($object);
-        }
+        // Vérifiez si la page est chargée correctement
+        $this->assertResponseIsSuccessful();
 
-        $this->manager->flush();
+        $form = $crawler->selectButton('submit')->form();
+
+        // Remplir les données du formulaire avec des participants et des exclusions
+        $form['participantForm[participants][0][name]'] = 'Sergio';
+        $form['participantForm[participants][0][email]'] = 'sergio@test.com';
+        $form['participantForm[participants][0][exclusions]'] = '2';
+
+        $form['participantForm[participants][1][name]'] = 'Rémy';
+        $form['participantForm[participants][1][email]'] = 'remy@test.com';
+        $form['participantForm[participants][1][exclusions]'] = '1';
+
+        $form['participantForm[participants][2][name]'] = 'Alex';
+        $form['participantForm[participants][2][email]'] = 'alex@test.com';
+        $form['participantForm[participants][2][exclusions]'] = '4,2';
+
+        $form['participantForm[participants][3][name]'] = 'Valentina';
+        $form['participantForm[participants][3][email]'] = 'valentina@test.com';
+        $form['participantForm[participants][3][exclusions]'] = '';
+
+        // Soumettre le formulaire
+        $crawler = $client->submit($form);
+
+        // Vérifier que l'utilisateur est redirigé après un envoi réussi
+        $this->assertResponseRedirects('/group/compose_message');
     }
 
-    public function testIndex(): void
+    public function testSetupParticipantsWithExclusionError()
     {
-        $this->client->followRedirects();
-        $crawler = $this->client->request('GET', $this->path);
+        $client = static::createClient();
 
-        self::assertResponseStatusCodeSame(200);
-        self::assertPageTitleContains('Group index');
+        // Simuler un formulaire de participants avec trop d'exclusions
+        $crawler = $client->request('GET', '/group/setup/participant');
+        $form = $crawler->selectButton('Envoyer')->form();
 
-        // Use the $crawler to perform additional assertions e.g.
-        // self::assertSame('Some text on the page', $crawler->filter('.p')->first());
-    }
+        // Remplir le formulaire avec des exclusions invalides
+        $form['participantForm[participants][0][name]'] = 'Sergio';
+        $form['participantForm[participants][0][email]'] = 'sergio@test.com';
+        $form['participantForm[participants][0][exclusions]'] = '2,3,4';
 
-    public function testNew(): void
-    {
-        $this->markTestIncomplete();
-        $this->client->request('GET', sprintf('%snew', $this->path));
+        $form['participantForm[participants][1][name]'] = 'Rémy';
+        $form['participantForm[participants][1][email]'] = 'remy@test.com';
+        $form['participantForm[participants][1][exclusions]'] = '1,3,4';
 
-        self::assertResponseStatusCodeSame(200);
+        $form['participantForm[participants][2][name]'] = 'Alex';
+        $form['participantForm[participants][2][email]'] = 'alex@test.com';
+        $form['participantForm[participants][2][exclusions]'] = '1,2,4';
 
-        $this->client->submitForm('Save', [
-            'group[drawNumber]' => 'Testing',
-            'group[createdAt]' => 'Testing',
-            'group[updatedAt]' => 'Testing',
-            'group[isCompleted]' => 'Testing',
-        ]);
+        $form['participantForm[participants][3][name]'] = 'Valentina';
+        $form['participantForm[participants][3][email]'] = 'valentina@test.com';
+        $form['participantForm[participants][3][exclusions]'] = '1,2,3';
 
-        self::assertResponseRedirects($this->path);
+        // Soumettre le formulaire
+        $crawler = $client->submit($form);
 
-        self::assertSame(1, $this->repository->count([]));
-    }
-
-    public function testShow(): void
-    {
-        $this->markTestIncomplete();
-        $fixture = new Group();
-        $fixture->setDrawNumber('My Title');
-        $fixture->setCreatedAt('My Title');
-        $fixture->setUpdatedAt('My Title');
-        $fixture->setIsCompleted('My Title');
-
-        $this->manager->persist($fixture);
-        $this->manager->flush();
-
-        $this->client->request('GET', sprintf('%s%s', $this->path, $fixture->getId()));
-
-        self::assertResponseStatusCodeSame(200);
-        self::assertPageTitleContains('Group');
-
-        // Use assertions to check that the properties are properly displayed.
-    }
-
-    public function testEdit(): void
-    {
-        $this->markTestIncomplete();
-        $fixture = new Group();
-        $fixture->setDrawNumber('Value');
-        $fixture->setCreatedAt('Value');
-        $fixture->setUpdatedAt('Value');
-        $fixture->setIsCompleted('Value');
-
-        $this->manager->persist($fixture);
-        $this->manager->flush();
-
-        $this->client->request('GET', sprintf('%s%s/edit', $this->path, $fixture->getId()));
-
-        $this->client->submitForm('Update', [
-            'group[drawNumber]' => 'Something New',
-            'group[createdAt]' => 'Something New',
-            'group[updatedAt]' => 'Something New',
-            'group[isCompleted]' => 'Something New',
-        ]);
-
-        self::assertResponseRedirects('/group/');
-
-        $fixture = $this->repository->findAll();
-
-        self::assertSame('Something New', $fixture[0]->getDrawNumber());
-        self::assertSame('Something New', $fixture[0]->getCreatedAt());
-        self::assertSame('Something New', $fixture[0]->getUpdatedAt());
-        self::assertSame('Something New', $fixture[0]->getIsCompleted());
-    }
-
-    public function testRemove(): void
-    {
-        $this->markTestIncomplete();
-        $fixture = new Group();
-        $fixture->setDrawNumber('Value');
-        $fixture->setCreatedAt('Value');
-        $fixture->setUpdatedAt('Value');
-        $fixture->setIsCompleted('Value');
-
-        $this->manager->persist($fixture);
-        $this->manager->flush();
-
-        $this->client->request('GET', sprintf('%s%s', $this->path, $fixture->getId()));
-        $this->client->submitForm('Delete');
-
-        self::assertResponseRedirects('/group/');
-        self::assertSame(0, $this->repository->count([]));
+        // Vérifier que le formulaire est renvoyé avec une erreur de validation des exclusions
+        $this->assertResponseIsSuccessful();
+        $this->assertSelectorTextContains('.flash-error', 'a trop d\'exclusions');
     }
 }

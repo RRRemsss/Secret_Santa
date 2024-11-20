@@ -14,7 +14,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/group', name:'group_')]
 class GroupController extends AbstractController
-{
+{    
     #[Route('/setup/participant', name: 'setup_participants', methods: ['GET', 'POST'])]
     public function setupParticipants(Request $request, GroupManagerService $groupManager) {
         // Create a form to manually add participants
@@ -30,43 +30,64 @@ class GroupController extends AbstractController
                 if ($extension === 'csv') {
                     // If it's a CSV, use the CSV import method
                     $participantsData = $groupManager->importFromCsv($file);
-                } elseif (in_array($extension, ['xls', 'xlsx'])) {
-                    // If it's an Excel file, use the Excel import method
-                    $participantsData = $groupManager->importFromExcel($file);
+                // } elseif (in_array($extension, ['xls', 'xlsx'])) {
+                //     // If it's an Excel file, use the Excel import method
+                //     $participantsData = $groupManager->importFromExcel($file);
                 } else {
                     throw new \Exception('Format de fichier non supporté. Veuillez uploader un fichier CSV ou Excel.');
                 }
 
                 if (empty($participantsData)) {
-                    $this->addFlash('error', 'Le fichier est vide ou mal formaté. Veuillez vérifier.');
+                    $this->addFlash('flash_error', 'Le fichier est vide ou mal formaté. Veuillez vérifier.');
                 } else {
                     $group = $groupManager->createGroup($participantsData);
                     $request->getSession()->set('participantsData', $participantsData);
                     return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
                 }
             } catch (\Exception $e) {
-                $this->addFlash('error', 'Erreur lors de l\'importation du fichier : ' . $e->getMessage());
+                $this->addFlash('flash_error', 'Erreur lors de l\'importation du fichier : ' . $e->getMessage());
             }
         }
 
         if ($participantForm->isSubmitted() && $participantForm->isValid()) {
             // Process the submitted form data
             $formData = $request->request->all('participant'); // Retrieve "participant" data as an associative array
-            // Prepare data for session storage
             $participantsArray = [];
+            $validationError = false;
+
             foreach ($formData as $index => $participant) {
+                // Préparation des exclusions
+                // $exclusions = isset($participant['exclusion']) ? explode(',', $participant['exclusion']) : [];
+                $exclusions = isset($participant['exclusion']) ? array_map('trim', explode(',', $participant['exclusion'])) : [];
                 $participantsArray[] = [
                     'id' => $index + 1,
                     'name' => $participant['name'] ?? null,
                     'email' => $participant['email'] ?? null,
-                    'exclusion' => isset($participant['exclusion']) ? explode(',', $participant['exclusion']) : [],
+                    'exclusion' => $exclusions, // Stocke les indices des exclusions
                 ];
+
+                // Validation: vérifier que le participant a au moins un choix possible de receiver
+                if (count($exclusions) >= count($formData) - 1) {
+                    $validationError = true;
+                    $this->addFlash(
+                        'error',
+                        "L'utilisateur " . ($participant['name'] ?? 'inconnu') . " a trop d'exclusions, empêchant le tirage de se réaliser. Veuillez corriger les exclusions."
+                    );
+                }
             }
-        
-            // Create the group and store participants in session
+
+            // Bloquer la validation si une erreur est détectée
+            if ($validationError) {
+                return $this->render('group/setup_participants.html.twig', [
+                    'participantForm' => $participantForm->createView(),
+                ]);
+            }
+
+            // Création du groupe et persistance des participants avec exclusions
             $group = $groupManager->createGroup($participantsArray);
+            $groupManager->drawParticipants($participantsArray, $group);
+
             $request->getSession()->set('participantsData', $participantsArray);
-        
             return $this->redirectToRoute('group_compose_message', ['groupId' => $group->getId()]);
         }
 
@@ -74,7 +95,6 @@ class GroupController extends AbstractController
             'participantForm' => $participantForm->createView(),
         ]);
     }
-
 
     #[Route('/compose_message/{groupId}', name: 'compose_message', methods: ['GET', 'POST'])]
     public function composeMessage(Request $request, int $groupId, GroupManagerService $groupManager, EmailService $emailService)
@@ -153,12 +173,19 @@ class GroupController extends AbstractController
         $reviewDrawForm->handleRequest($request);
 
         if ($reviewDrawForm->isSubmitted() && $reviewDrawForm->isValid()) {
+
+            // Assign receivers to givers
+            $groupManager->assignReceiversToGivers($group);
+            
             // Send emails
             $emailService->sendGroupEmail($group, $subject, $body);
 
+            $this->addFlash('success','L\envoi de emails a bien été fait');
+
             // Redirect to the next step (summaryDraw)
-            return $this->redirectToRoute('summary_draw', ['groupId' => $group->getId()]);
+            return $this->redirectToRoute('group_summary_draw', ['groupId' => $group->getId()]);
         }
+
 
         return $this->render('group/review_draw.html.twig', [
             'group' => $group,
@@ -168,9 +195,17 @@ class GroupController extends AbstractController
             'participants' => $participantsData,
         ]);
     }
-    // #[Route('/summaryDraw/{groupId}', name: 'summary_draw', methods: ['GET', 'POST'])]
-    // public function summaryDraw(Request $request, int $groupId, GroupManagerService $groupManager, EmailService $emailService): Response
-    // {
-       
-    // }
+
+    #[Route('/summaryDraw/{groupId}', name: 'summary_draw', methods: ['GET'])]
+    public function summaryDraw(Request $request, int $groupId, GroupManagerService $groupManager): Response
+    {
+       // Récupérer les informations du groupe et des participants
+        $group = $groupManager->findGroupById($groupId);
+        $participants = $group->getParticipants(); // Adaptez selon votre modèle
+
+        return $this->render('group/summary_draw.html.twig', [
+            'group' => $group,
+            'participants' => $participants,
+        ]);
+    }
 }

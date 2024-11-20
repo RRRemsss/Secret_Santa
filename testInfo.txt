@@ -1,0 +1,19 @@
+******************************************************* TESTS *****************************************************************
+
+=> Test unitaire
+=> Test fonctionnel
+
+
+
+Installation Cypress pour tester les formulaires (car comporte du JS)
+
+Nodes doit être installé au préalable.
+
+==> npm install cypress --save-dev
+==> npx cypress open 
+
+(si ne fonctionne pas, desinstaller cypress et réinstaller)
+==> rm -rf C:\Users\remyg\AppData\Local\Cypress
+==> npm install cypress --save-dev
+==> npx cypress open
+
